@@ -7,13 +7,12 @@ import matplotlib.pyplot as plt
 env = gym.make("MountainCar-v0")
 
 # number of episodes
-episodes = 100000
+episodes = 60000
 
 # learning rate a and exploration/exploitation rate e and discount rate d
 a = 0.2
 e = 1.0
 d = 0.9
-count = 0
 rewards = []
 success_rate = []
 success = 0.0
@@ -39,6 +38,7 @@ for eps in range(episodes):
     old_position = np.searchsorted(position_range, 0)
     old_velocity = np.searchsorted(velocity_range, 0)
 
+    # print number of iterations every 1000 iterations
     if eps % 1000 is 0:
         print (eps)
 
@@ -51,8 +51,8 @@ for eps in range(episodes):
 
     # run episode
     while (not done):
-        # if eps >= episodes - 100:
-            # env.render()
+        if eps % 1000 is 0:
+            env.render()
 
         # calculate next step
         if random.random() < e:
@@ -85,10 +85,11 @@ for eps in range(episodes):
         old_velocity = velocity
     rewards.append(total_reward)
     success_rate.append(success/(eps+1))
+    if eps % 100 is 0:
+        success = 0
 
 plt.plot(success_rate)
 plt.show()
 
 plt.plot(rewards)
 plt.show()
-print("success: ", count)

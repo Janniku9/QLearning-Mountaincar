@@ -48,7 +48,7 @@ class DeepQNetwork():
         return np.argmax(act_values[0])
 
     def load(self, name):
-        self.model.load_weights(name)
+        
 
     def save(self, name):
         self.model.save_weights(name)

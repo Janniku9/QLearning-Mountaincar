@@ -2,16 +2,17 @@ import numpy as np
 from numpy import random
 import gym
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 # make new environment
 env = gym.make("MountainCar-v0")
 
 # number of episodes
-episodes = 60000
+episodes = 1000
 
 # learning rate a and exploration/exploitation rate e and discount rate d
 a = 0.2
-e = 1.0
+e = 0
 d = 0.9
 rewards = []
 success_rate = []
@@ -21,7 +22,7 @@ success = 0.0
 low = env.observation_space.low
 high = env.observation_space.high
 
-# because space is not discrete i make it discrete with s points
+# because space is not discrete, make it discrete with s points
 s = 200
 position_range = np.linspace(low[0], high[0], s)
 velocity_range = np.linspace(low[1], high[1], int(s/5))
@@ -30,9 +31,10 @@ velocity_range = np.linspace(low[1], high[1], int(s/5))
 actions = env.action_space.n
 
 # init QTable with dimension  s x s/5 x actions
-QTable = np.zeros((s, int(s/5), actions))
+#QTable = np.zeros((s, int(s/5), actions))
+QTable = np.load('qtable2.npy')
 
-for eps in range(episodes):
+for eps in tqdm(range(1, episodes+1), unit="episode"):
     # reset episode and get initial state
     env.reset()
     old_position = np.searchsorted(position_range, 0)
@@ -93,3 +95,5 @@ plt.show()
 
 plt.plot(rewards)
 plt.show()
+
+np.save('qtable3', QTable)

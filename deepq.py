@@ -1,76 +1,80 @@
 import gym
 import numpy as np
-import matplotlib.pyplot as plt
+import DeepQNetworkV2
+from tqdm import tqdm
+from keras.utils.np_utils import to_categorical   
+import pickle as pkl
 
-import sys
-sys.path.append('../')
+EPISODES = 30_000
 
-import Memory
-import DeepQNetworkWithTarget
+EPSILON = 1
+EPSILON_DECAY = 0.99975
+MIN_EPSILON = 0.001
 
-write = True
-load = False
+AGGREGATE_STATS_EVERY = 50
+RENDER = True
 
 # make new environment
 env = gym.make('MountainCar-v0')
 
 # init state_size and action_space
-state_size = env.observation_space.shape[0]
+norm = np.subtract(env.observation_space.high, env.observation_space.low)
+state_size = env.observation_space.shape
 action_size = env.action_space.n
 
-# init new DeepQNetwork
-dqn = DeepQNetworkWithTarget.DeepQNetworkWithTarget(state_size, action_size, 2000, 0.95, 1.0, 0.1, 0.995, 0.125, 0.01)
-if load:
-    dqn.load('weights.h5')
+# get space low and high
+low = env.observation_space.low
+high = env.observation_space.high
 
-done=False
-batch_size=32
+# because space is not discrete, make it discrete with s points
+s = 200
+position_range = np.linspace(low[0], high[0], s)
+velocity_range = np.linspace(low[1], high[1], int(s/5))
 
-episodes = 5000
-steps = 200
+dqn = DeepQNetworkV2.DQN(state_size, action_size)
+episode_rewards = []
 
-rewards = []
-success = 0
+QTable = np.load('qtable2.npy')
 
-render = False
-total_success = 0
+    
 
-for eps in range(episodes):
-    state = env.reset()
-    state = np.reshape(state, [1, state_size])
+for episode in tqdm(range(1, EPISODES+1), unit="episode"):
+    dqn.tensorboard.step = episode
 
-    total_reward = 0
-    for s in range(steps):
-        if render:
+    step = 1
+    current_state = np.add(np.divide(env.reset(), norm), env.observation_space.low)
+    done = False
+    episode_reward = 0
+
+    while not done and step <= 200:
+        if np.random.random() > EPSILON:
+            action = np.argmax(dqn.get_qs(current_state))
+        else:
+            action = np.random.randint(0, action_size)
+        
+        new_state, reward, done, info = env.step(action)
+        new_state = np.add(np.divide(new_state, norm), env.observation_space.low)
+        episode_reward += reward
+
+        if RENDER and not episode % AGGREGATE_STATS_EVERY:
             env.render()
-        elif eps%100 is 0:
-            env.render()
+        
+        dqn.update_replay_memory((current_state, action, reward, new_state, done))
+        dqn.train(done, step)
 
-        next_action = dqn.choose_next_action(state)
-        next_state, reward, done, _ = env.step(next_action)
+        current_state = new_state
+        step += 1
 
-        total_reward += reward
+    episode_rewards.append(episode_reward)
+    
+    if EPSILON > MIN_EPSILON:
+        EPSILON *= EPSILON_DECAY
+        EPSILON = max(EPSILON, MIN_EPSILON)
 
-        next_state = np.reshape(next_state, [1, state_size])
-
-        dqn.store_sample(state, next_action, reward, next_state, done)
-        state = next_state
-
-        if done:
-            if s < steps-1:
-                success += 1
-            break
-    if len(dqn.mem.mem) > batch_size:
-        dqn.replay(batch_size)
-        dqn.update_target()
-    rewards.append(total_reward)
-    if eps%100 is 0:
-            if write:
-                dqn.save('weights.h5')
-                print ("saved weights")
-            print("succesful: ", success)
-            success = 0
-
-            
-plt.plot(rewards)
-plt.show()
+    if not episode % AGGREGATE_STATS_EVERY or episode == 1:
+        average_reward = sum(episode_rewards[-AGGREGATE_STATS_EVERY:])/len(episode_rewards[-AGGREGATE_STATS_EVERY:])
+        min_reward = min(episode_rewards[-AGGREGATE_STATS_EVERY:])
+        max_reward = max(episode_rewards[-AGGREGATE_STATS_EVERY:])
+        dqn.tensorboard.update_stats(reward_avg=average_reward, reward_min=min_reward, reward_max=max_reward)
+        
+        # dqn.save_model(max_reward, min_reward, average_reward)

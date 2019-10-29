@@ -4,3 +4,4 @@ settings.json
 logs/
 models/
 test/
+*.npy
